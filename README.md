@@ -38,7 +38,7 @@ Welcome to **Game Vault** — a dynamic, responsive gaming wallpaper website pow
 
 ## 📸 UI Preview
 
-![Game Vault UI](https://via.placeholder.com/800x400?text=GameVault+Preview)
+![Game Vault UI](gamevault.png)
 
 ---
 
@@ -54,25 +54,6 @@ Welcome to **Game Vault** — a dynamic, responsive gaming wallpaper website pow
    cd Game-vault
    ```
 
-3. **Open `index.html` in your browser:**
-   ```bash
-   start index.html
-   ```
-   _Alternatively, you can use a local development server for better performance._
-
----
-
-## 🔥 Animations & Effects
-
-The UI comes alive with:
-
-- **Fade-in and Slide animations** on page load.
-- **Hover effects** on game cards.
-- **Smooth scrolling** between sections.
-
-💡 _Animations are crafted with CSS3 for performance and fluidity._
-
----
 
 ## 🔧 API Setup
 
