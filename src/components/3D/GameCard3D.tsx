@@ -21,7 +21,7 @@ interface GameCard3DProps {
 // 3D Card Component with robust texture loading
 function Card3D({ imageUrl, isHovered }: { imageUrl: string; isHovered: boolean }) {
   const meshRef = useRef<any>();
-  const [texture, setTexture] = useState<Texture | null>(null);
+  const [texture, setTexture] = useState<Texture | undefined>(undefined);
   const [hasTextureError, setHasTextureError] = useState(false);
 
   // Manual texture loading with error handling
@@ -41,7 +41,7 @@ function Card3D({ imageUrl, isHovered }: { imageUrl: string; isHovered: boolean 
       (error) => {
         console.warn('Failed to load texture:', imageUrl, error);
         setHasTextureError(true);
-        setTexture(null);
+        setTexture(undefined);
         
         // Try loading fallback image
         if (imageUrl !== FALLBACK_IMAGE) {
@@ -55,7 +55,7 @@ function Card3D({ imageUrl, isHovered }: { imageUrl: string; isHovered: boolean 
             (fallbackError) => {
               console.error('Failed to load fallback texture:', fallbackError);
               setHasTextureError(true);
-              setTexture(null);
+              setTexture(undefined);
             }
           );
         }
