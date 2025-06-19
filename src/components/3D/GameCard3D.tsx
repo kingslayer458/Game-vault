@@ -1,7 +1,7 @@
-import { useRef, useState, useCallback, memo } from 'react';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { useRef, useState, useCallback, memo, useEffect } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Text, Box, Plane } from '@react-three/drei';
-import { TextureLoader, DoubleSide } from 'three';
+import { TextureLoader, DoubleSide, Texture } from 'three';
 import { Link } from 'react-router-dom';
 import { Star, Heart, Play } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -18,10 +18,57 @@ interface GameCard3DProps {
   index: number;
 }
 
-// 3D Card Component
+// 3D Card Component with robust texture loading
 function Card3D({ imageUrl, isHovered }: { imageUrl: string; isHovered: boolean }) {
   const meshRef = useRef<any>();
-  const texture = useLoader(TextureLoader, imageUrl);
+  const [texture, setTexture] = useState<Texture | null>(null);
+  const [hasTextureError, setHasTextureError] = useState(false);
+
+  // Manual texture loading with error handling
+  useEffect(() => {
+    const loader = new TextureLoader();
+    
+    loader.load(
+      imageUrl,
+      // onLoad
+      (loadedTexture) => {
+        setTexture(loadedTexture);
+        setHasTextureError(false);
+      },
+      // onProgress
+      undefined,
+      // onError
+      (error) => {
+        console.warn('Failed to load texture:', imageUrl, error);
+        setHasTextureError(true);
+        setTexture(null);
+        
+        // Try loading fallback image
+        if (imageUrl !== FALLBACK_IMAGE) {
+          loader.load(
+            FALLBACK_IMAGE,
+            (fallbackTexture) => {
+              setTexture(fallbackTexture);
+              setHasTextureError(false);
+            },
+            undefined,
+            (fallbackError) => {
+              console.error('Failed to load fallback texture:', fallbackError);
+              setHasTextureError(true);
+              setTexture(null);
+            }
+          );
+        }
+      }
+    );
+
+    return () => {
+      // Cleanup texture on unmount
+      if (texture) {
+        texture.dispose();
+      }
+    };
+  }, [imageUrl]);
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -41,11 +88,19 @@ function Card3D({ imageUrl, isHovered }: { imageUrl: string; isHovered: boolean 
   return (
     <group ref={meshRef}>
       <Box args={[4, 2.5, 0.1]} position={[0, 0, 0]}>
-        <meshStandardMaterial 
-          map={texture} 
-          metalness={0.3}
-          roughness={0.4}
-        />
+        {texture && !hasTextureError ? (
+          <meshStandardMaterial 
+            map={texture} 
+            metalness={0.3}
+            roughness={0.4}
+          />
+        ) : (
+          <meshBasicMaterial 
+            color="#374151" 
+            transparent 
+            opacity={0.8}
+          />
+        )}
       </Box>
       
       {/* Glowing edges */}
@@ -96,6 +151,29 @@ export const GameCard3D = memo(function GameCard3D({ game, index }: GameCard3DPr
   const inWishlist = isInWishlist(game.id);
   const [showVideo, setShowVideo] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [validImageUrl, setValidImageUrl] = useState<string>(FALLBACK_IMAGE);
+
+  // Pre-validate image URL
+  useEffect(() => {
+    if (!game.background_image) {
+      setValidImageUrl(FALLBACK_IMAGE);
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      setValidImageUrl(game.background_image);
+    };
+    
+    img.onerror = () => {
+      console.warn('Failed to pre-load game image:', game.background_image);
+      setValidImageUrl(FALLBACK_IMAGE);
+    };
+    
+    img.src = game.background_image;
+  }, [game.background_image]);
 
   const handleWishlist = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -151,13 +229,17 @@ export const GameCard3D = memo(function GameCard3D({ game, index }: GameCard3DPr
             <Canvas
               camera={{ position: [0, 0, 5], fov: 50 }}
               className="w-full h-full"
+              onCreated={({ gl }) => {
+                // Configure WebGL context for better error handling
+                gl.debug.checkShaderErrors = false;
+              }}
             >
               <ambientLight intensity={0.4} />
               <pointLight position={[10, 10, 10]} intensity={1} />
               <pointLight position={[-10, -10, -10]} intensity={0.5} color="#3b82f6" />
               
               <Card3D 
-                imageUrl={game.background_image || FALLBACK_IMAGE} 
+                imageUrl={validImageUrl} 
                 isHovered={isHovered}
               />
             </Canvas>
@@ -167,7 +249,7 @@ export const GameCard3D = memo(function GameCard3D({ game, index }: GameCard3DPr
               <div className="absolute inset-0 z-20">
                 <VideoPreview
                   videoUrl={game.clip.clip}
-                  thumbnailUrl={game.background_image || FALLBACK_IMAGE}
+                  thumbnailUrl={validImageUrl}
                 />
               </div>
             )}
