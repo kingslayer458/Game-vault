@@ -8,6 +8,7 @@ export const api = axios.create({
   params: {
     key: API_KEY,
   },
+  timeout: 10000, // 10 second timeout
 });
 
 // Enhanced Game interface with more details
@@ -179,76 +180,108 @@ export interface GameCreator {
 }
 
 export async function getGames(params?: Record<string, any>) {
-  const { data } = await api.get<{ results: Game[] }>('/games', { params });
-  return data.results;
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', { params });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching games:', error);
+    throw new Error('Failed to fetch games');
+  }
 }
 
 export async function getGameDetails(id: string) {
-  const [
-    gameResponse,
-    screenshotsResponse,
-    additionsResponse,
-    gameSeriesResponse,
-    storesResponse,
-    creatorsResponse,
-  ] = await Promise.all([
-    api.get<GameDetails>(`/games/${id}`),
-    api.get<{ results: Screenshot[] }>(`/games/${id}/screenshots`),
-    api.get<{ results: DLC[] }>(`/games/${id}/additions`),
-    api.get<{ results: Game[] }>(`/games/${id}/game-series`),
-    api.get<{ results: Store[] }>(`/games/${id}/stores`),
-    api.get<{ results: GameCreator[] }>(`/games/${id}/development-team`),
-  ]);
+  try {
+    const gameResponse = await api.get<GameDetails>(`/games/${id}`);
+    
+    // Fetch additional data with error handling
+    const [
+      screenshotsResponse,
+      additionsResponse,
+      gameSeriesResponse,
+      storesResponse,
+    ] = await Promise.allSettled([
+      api.get<{ results: Screenshot[] }>(`/games/${id}/screenshots`),
+      api.get<{ results: DLC[] }>(`/games/${id}/additions`),
+      api.get<{ results: Game[] }>(`/games/${id}/game-series`),
+      api.get<{ results: Store[] }>(`/games/${id}/stores`),
+    ]);
 
-  // Get similar games based on tags and genres
-  const similarGamesResponse = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      genres: gameResponse.data.genres?.map(g => g.id).join(',') || '',
-      exclude_additions: true,
-      page_size: 4,
-    },
-  });
+    // Get similar games based on tags and genres
+    let similarGamesResponse;
+    try {
+      const genreIds = gameResponse.data.genres?.map(g => g.id).join(',') || '';
+      if (genreIds) {
+        similarGamesResponse = await api.get<{ results: Game[] }>('/games', {
+          params: {
+            genres: genreIds,
+            exclude_additions: true,
+            page_size: 4,
+          },
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to fetch similar games:', error);
+    }
 
-  return {
-    ...gameResponse.data,
-    screenshots: screenshotsResponse.data.results,
-    dlc: additionsResponse.data.results,
-    game_series: gameSeriesResponse.data.results,
-    stores: storesResponse.data.results,
-    creators: creatorsResponse.data.results,
-    similar_games: similarGamesResponse.data.results.filter(g => g.id !== parseInt(id)),
-  };
+    return {
+      ...gameResponse.data,
+      screenshots: screenshotsResponse.status === 'fulfilled' ? screenshotsResponse.value.data.results : [],
+      dlc: additionsResponse.status === 'fulfilled' ? additionsResponse.value.data.results : [],
+      game_series: gameSeriesResponse.status === 'fulfilled' ? gameSeriesResponse.value.data.results : [],
+      stores: storesResponse.status === 'fulfilled' ? storesResponse.value.data.results : [],
+      creators: [], // This endpoint might not exist, so we'll leave it empty
+      similar_games: similarGamesResponse?.data.results.filter(g => g.id !== parseInt(id)) || [],
+    };
+  } catch (error) {
+    console.error('Error fetching game details:', error);
+    throw new Error('Failed to fetch game details');
+  }
 }
 
 export async function searchGames(query: string) {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: { search: query },
-  });
-  return data.results;
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: { search: query },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error searching games:', error);
+    throw new Error('Failed to search games');
+  }
 }
 
 export async function getTopRatedGames() {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      ordering: '-rating',
-      metacritic: '80,100',
-    },
-  });
-  return data.results;
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        ordering: '-rating',
+        metacritic: '80,100',
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching top rated games:', error);
+    throw new Error('Failed to fetch top rated games');
+  }
 }
 
 export async function getUpcomingGames() {
-  const today = new Date().toISOString().split('T')[0];
-  const nextYear = new Date();
-  nextYear.setFullYear(nextYear.getFullYear() + 1);
-  
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      dates: `${today},${nextYear.toISOString().split('T')[0]}`,
-      ordering: '-added',
-    },
-  });
-  return data.results;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        dates: `${today},${nextYear.toISOString().split('T')[0]}`,
+        ordering: '-added',
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching upcoming games:', error);
+    throw new Error('Failed to fetch upcoming games');
+  }
 }
 
 export interface GameNewsResponse {
@@ -257,154 +290,175 @@ export interface GameNewsResponse {
 }
 
 export async function getGameNews(page = 1): Promise<GameNewsResponse> {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      ordering: '-updated',
-      page_size: 10,
-      page,
-    },
-  });
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        ordering: '-updated',
+        page_size: 10,
+        page,
+      },
+    });
 
-  const news = await Promise.all(
-    data.results.map(async (game) => {
-      const details = await getGameDetails(game.id.toString());
-      return {
-        id: game.id,
-        title: `${game.name} - Latest Updates`,
-        description: details.description_raw?.slice(0, 200) + '...' || 'No description available',
-        image: game.background_image,
-        website: details.website,
-        published: new Date().toISOString(),
-      };
-    })
-  );
+    const news = data.results.map((game) => ({
+      id: game.id,
+      title: `${game.name} - Latest Updates`,
+      description: game.description_raw?.slice(0, 200) + '...' || 'No description available',
+      image: game.background_image,
+      website: game.website,
+      published: new Date().toISOString(),
+    }));
 
-  return {
-    results: news,
-    next: page * 10 < 50 ? String(page + 1) : null, // Limit to 5 pages total
-  };
+    return {
+      results: news,
+      next: page * 10 < 50 ? String(page + 1) : null,
+    };
+  } catch (error) {
+    console.error('Error fetching game news:', error);
+    throw new Error('Failed to fetch game news');
+  }
 }
 
 export async function getGamingEvents() {
-  const today = new Date();
-  const threeMonthsFromNow = new Date();
-  threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+  try {
+    const today = new Date();
+    const threeMonthsFromNow = new Date();
+    threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
 
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      dates: `${today.toISOString().split('T')[0]},${threeMonthsFromNow.toISOString().split('T')[0]}`,
-      ordering: 'released',
-      page_size: 10,
-    },
-  });
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        dates: `${today.toISOString().split('T')[0]},${threeMonthsFromNow.toISOString().split('T')[0]}`,
+        ordering: 'released',
+        page_size: 10,
+      },
+    });
 
-  return data.results.map(game => ({
-    id: game.id,
-    title: `${game.name} Launch Event`,
-    description: `Get ready for the launch of ${game.name}! Join the gaming community in celebrating this highly anticipated release.`,
-    start_date: game.released,
-    end_date: game.released,
-    location: 'Global Release',
-    type: 'release' as const,
-    image_url: game.background_image,
-  }));
+    return data.results.map(game => ({
+      id: game.id,
+      title: `${game.name} Launch Event`,
+      description: `Get ready for the launch of ${game.name}! Join the gaming community in celebrating this highly anticipated release.`,
+      start_date: game.released,
+      end_date: game.released,
+      location: 'Global Release',
+      type: 'release' as const,
+      image_url: game.background_image,
+    }));
+  } catch (error) {
+    console.error('Error fetching gaming events:', error);
+    throw new Error('Failed to fetch gaming events');
+  }
 }
 
 // New API functions for additional features
 export async function getGamesByTag(tag: string) {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      tags: tag,
-      page_size: 20,
-    },
-  });
-  return data.results;
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        tags: tag,
+        page_size: 20,
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching games by tag:', error);
+    throw new Error('Failed to fetch games by tag');
+  }
 }
 
 export async function getGamesByDeveloper(developerId: number) {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      developers: developerId,
-      page_size: 20,
-    },
-  });
-  return data.results;
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        developers: developerId,
+        page_size: 20,
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching games by developer:', error);
+    throw new Error('Failed to fetch games by developer');
+  }
 }
 
 export async function getGamesByPublisher(publisherId: number) {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      publishers: publisherId,
-      page_size: 20,
-    },
-  });
-  return data.results;
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        publishers: publisherId,
+        page_size: 20,
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching games by publisher:', error);
+    throw new Error('Failed to fetch games by publisher');
+  }
 }
 
 export async function getTrendingGames() {
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
-  
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      dates: `${lastMonth.toISOString().split('T')[0]},${new Date().toISOString().split('T')[0]}`,
-      ordering: '-added',
-      page_size: 20,
-    },
-  });
-  return data.results;
+  try {
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        dates: `${lastMonth.toISOString().split('T')[0]},${new Date().toISOString().split('T')[0]}`,
+        ordering: '-added',
+        page_size: 20,
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching trending games:', error);
+    throw new Error('Failed to fetch trending games');
+  }
 }
 
 export async function getMostAnticipatedGames() {
-  const today = new Date();
-  const nextYear = new Date();
-  nextYear.setFullYear(nextYear.getFullYear() + 1);
-  
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      dates: `${today.toISOString().split('T')[0]},${nextYear.toISOString().split('T')[0]}`,
-      ordering: '-added',
-      page_size: 20,
-    },
-  });
-  return data.results;
+  try {
+    const today = new Date();
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        dates: `${today.toISOString().split('T')[0]},${nextYear.toISOString().split('T')[0]}`,
+        ordering: '-added',
+        page_size: 20,
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching most anticipated games:', error);
+    throw new Error('Failed to fetch most anticipated games');
+  }
 }
 
 export async function getGamesByPlatform(platformId: number) {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      platforms: platformId,
-      page_size: 20,
-    },
-  });
-  return data.results;
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        platforms: platformId,
+        page_size: 20,
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching games by platform:', error);
+    throw new Error('Failed to fetch games by platform');
+  }
 }
 
 export async function getGamesByGenre(genreId: number) {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      genres: genreId,
-      page_size: 20,
-    },
-  });
-  return data.results;
-}
-
-// Mock function for guides since RAWG doesn't have a guides endpoint
-export async function getGameGuides() {
-  const { data } = await api.get<{ results: Game[] }>('/games', {
-    params: {
-      ordering: '-rating',
-      page_size: 10,
-    },
-  });
-
-  return data.results.map(game => ({
-    id: game.id,
-    title: `Complete Guide to ${game.name}`,
-    description: `Master ${game.name} with our comprehensive guide covering gameplay mechanics, tips, and strategies.`,
-    image: game.background_image,
-    website: game.website,
-    published: new Date().toISOString(),
-  }));
+  try {
+    const { data } = await api.get<{ results: Game[] }>('/games', {
+      params: {
+        genres: genreId,
+        page_size: 20,
+      },
+    });
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching games by genre:', error);
+    throw new Error('Failed to fetch games by genre');
+  }
 }

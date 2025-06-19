@@ -12,10 +12,13 @@ export function Home() {
     hasNextPage,
     isFetchingNextPage,
     status,
+    error,
   } = useInfiniteQuery({
     queryKey: ['games'],
     queryFn: ({ pageParam = 1 }) => getGames({ page: pageParam }),
     getNextPageParam: (_, pages) => pages.length + 1,
+    retry: 3,
+    retryDelay: 1000,
   });
 
   if (status === 'pending') {
@@ -23,14 +26,24 @@ export function Home() {
   }
 
   if (status === 'error') {
+    console.error('Home page error:', error);
     return (
-      <div className="text-center text-red-500 py-8">
-        Error loading games. Please try again later.
+      <div className="text-center py-8">
+        <div className="text-red-500 mb-4">
+          <h2 className="text-2xl font-bold mb-2">Unable to load games</h2>
+          <p>Please check your internet connection and try again.</p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
-  const games = data.pages.flat();
+  const games = data?.pages.flat() || [];
 
   return (
     <div>
@@ -104,18 +117,24 @@ export function Home() {
         Popular Games
       </motion.h2>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-        {games.map((game: Game, index) => (
-          <motion.div
-            key={game.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <GameCard game={game} />
-          </motion.div>
-        ))}
-      </div>
+      {games.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+          {games.map((game: Game, index) => (
+            <motion.div
+              key={game.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <GameCard game={game} />
+            </motion.div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-gray-400 py-8">
+          <p>No games available at the moment.</p>
+        </div>
+      )}
       
       {hasNextPage && (
         <div className="flex justify-center mt-8 md:mt-12">
