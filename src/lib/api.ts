@@ -34,6 +34,7 @@ export interface Game {
   parents_count: number;
   additions_count: number;
   game_series_count: number;
+  achievements_count: number;
   esrb_rating: {
     id: number;
     name: string;
@@ -133,6 +134,10 @@ export interface GameDetails extends Game {
   similar_games: Game[];
   playtime: number;
   player_count?: number;
+  screenshots: Screenshot[];
+  game_series: Game[];
+  stores: Store[];
+  creators: GameCreator[];
 }
 
 export interface GameNews {
@@ -198,7 +203,7 @@ export async function getGameDetails(id: string) {
   // Get similar games based on tags and genres
   const similarGamesResponse = await api.get<{ results: Game[] }>('/games', {
     params: {
-      genres: gameResponse.data.genres.map(g => g.id).join(','),
+      genres: gameResponse.data.genres?.map(g => g.id).join(',') || '',
       exclude_additions: true,
       page_size: 4,
     },
@@ -266,7 +271,7 @@ export async function getGameNews(page = 1): Promise<GameNewsResponse> {
       return {
         id: game.id,
         title: `${game.name} - Latest Updates`,
-        description: details.description_raw.slice(0, 200) + '...',
+        description: details.description_raw?.slice(0, 200) + '...' || 'No description available',
         image: game.background_image,
         website: details.website,
         published: new Date().toISOString(),
@@ -383,4 +388,23 @@ export async function getGamesByGenre(genreId: number) {
     },
   });
   return data.results;
+}
+
+// Mock function for guides since RAWG doesn't have a guides endpoint
+export async function getGameGuides() {
+  const { data } = await api.get<{ results: Game[] }>('/games', {
+    params: {
+      ordering: '-rating',
+      page_size: 10,
+    },
+  });
+
+  return data.results.map(game => ({
+    id: game.id,
+    title: `Complete Guide to ${game.name}`,
+    description: `Master ${game.name} with our comprehensive guide covering gameplay mechanics, tips, and strategies.`,
+    image: game.background_image,
+    website: game.website,
+    published: new Date().toISOString(),
+  }));
 }

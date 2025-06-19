@@ -143,7 +143,9 @@ export function GameDetails() {
               <div className="space-y-8">
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
                   <h2 className="text-2xl font-bold mb-4">About</h2>
-                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{game.description_raw}</p>
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {game.description_raw || 'No description available for this game.'}
+                  </p>
                 </div>
 
                 {/* Achievements */}
@@ -243,6 +245,13 @@ export function GameDetails() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'screenshots' && (!game.screenshots || game.screenshots.length === 0) && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                <h2 className="text-2xl font-bold mb-4">Screenshots</h2>
+                <p className="text-gray-500">No screenshots available for this game.</p>
               </div>
             )}
 
