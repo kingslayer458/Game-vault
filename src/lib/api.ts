@@ -8,7 +8,7 @@ export const api = axios.create({
   params: {
     key: API_KEY,
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // 30 second timeout (increased from 10 seconds)
 });
 
 // Enhanced Game interface with more details
